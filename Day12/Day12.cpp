@@ -162,6 +162,142 @@ private:
      int N_;
 };
 
+// Class describing a soup region
+class SoupRegion
+{
+public:
+
+    // Constructor
+    // Each region starts with one letter and a coordinate, which then sets it's area to 1 and perimeter to 4
+    SoupRegion(char letter, int coordinate, int N) : letter_(letter), perimeter_(4), area_(1), N_(N)
+    {
+        coordinates_ = {};
+        coordinates_.push_back(coordinate);
+    };
+
+    // Getters
+    const char& letter() const { return letter_; };
+    const int area() const { return area_; };
+    const int perimeter() const { return perimeter_; };
+    bool find(const int& coordinate) const { return std::find(coordinates_.begin(), coordinates_.end(), coordinate) != coordinates_.end(); };
+    bool find(const std::pair<int, int>& pos) const { return find(N_ * pos.first + pos.second + 1); };
+    const std::vector<int>& getRegionPositions() { return coordinates_; };
+
+    // Recursion function
+    void recurse(const int point, Region & r) 
+    {
+        // Find any points that are adjacent to the starting point
+        for (int i = 0; i < coordinates_.size(); i++)
+        {
+            if (arePointsAdjacent(point, coordinates_[i], N_))
+            {
+                // add this to this region
+                int coordinate = coordinates_[i];
+                r.add(coordinate);
+
+                // Delete this point from future consideration
+                coordinates_.erase(coordinates_.begin() + i);
+
+                // Since we removed a point in coordinates, the indices have shifted, let's
+                // start from the top again.
+                // This is slightly inefficient, but it's the safest way to avoid missing
+                // any traversal directions
+                i = -1;
+
+                // find any points that are adjacent to this newly added point
+                recurse(coordinate, r);
+
+            }
+
+        }
+
+        // Here, we've recursively found every adjacent point and added it to the region r,
+        // and deleted those points from the coordinates_ vector, so a fresh search can begin
+        // with no points in this region in consideration
+    };
+
+    // If we have a disconnected soup, we need to treat the cost as a product per connected subregion in the soup
+    // Note, this will destroy the coordinates member variable, so it is the final thing to call
+    int cost()
+    {
+        int cost = 0;
+
+        // Let's track the regions for debugging purposes
+        std::vector<Region> regions = {};
+        while (coordinates_.size() > 0)
+        {
+            // Start with the first point in the vector
+            // Create a new search region
+            int start = coordinates_[0];
+            Region r{letter(),start,N_};
+
+            // Now that we've considered this point, delete it
+            coordinates_.erase(coordinates_.begin());
+
+            // DO the recursive adjacent search
+            recurse(start,r);
+
+            // Now that we've constructed the region, update the cost
+            cost += r.cost();
+
+            // Track region for debugging purposes
+            regions.push_back(r);
+
+        }
+
+        return cost;
+    };
+
+    // Increase the region by adding a new coordinate
+    void add(const int& coordinate)
+    {
+        // Finally, let's add new coordinate to our list
+        coordinates_.push_back(coordinate);
+    };
+
+    // Increase the region by adding indices
+    // This is just if I get lazy and want to save time the conversion later
+    void add(const int& i, const int& j)
+    {
+        const int uniqueCoordinate = unique(i, j, N_);
+        add(uniqueCoordinate);
+    };
+
+    // And if I'm even lazier
+    void add(const std::pair<int, int>& pos)
+    {
+        add(pos.first, pos.second);
+    }
+
+    // Comparison operator
+    // Is this the same region we're in?
+    // Note this is not an *exact* equality, but just trying to figure out
+    // If we've stepped into an existing region or not
+    bool operator==(const SoupRegion other) const
+    {
+        // First, is the letter the same? If not, these can't be the same region
+        if (letter_ != other.letter_) return false;
+
+        // We then look at coordinates. If we have a common coordinate, this is the
+        // same region
+        for (const auto& coordinate : coordinates_)
+        {
+            if (other.find(coordinate)) return true;
+        }
+
+        // If the letter is the same, but none of the coordinates overlap,
+        // this is a different region
+        return false;
+    };
+
+private:
+    std::vector<int> coordinates_;
+    char letter_;
+    int perimeter_;
+    int area_;
+    int N_;
+};
+
 // Forward declarations
 std::vector<std::vector<char>> readFile(const std::string& name);
 std::vector<std::pair<int, int>> searchDirections(const int& i, const int& j, const int& N, std::pair<int, int> & exempt);
@@ -179,111 +315,162 @@ int main()
     //std:string input = "C:\\Users\\sahil\\OneDrive\\Documents\\advent\\day12\\smallexample.txt";
     //std:string input = "C:\\Users\\sahil\\OneDrive\\Documents\\advent\\day12\\debugtest.txt";
     //std:string input = "C:\\Users\\sahil\\OneDrive\\Documents\\advent\\day12\\nestedexample.txt";
-    std:string input = "C:\\Users\\sahil\\OneDrive\\Documents\\advent\\day12\\largerexample.txt";
-    //std:string input = "C:\\Users\\sahil\\OneDrive\\Documents\\advent\\day12\\myInput.txt";
+    //std:string input = "C:\\Users\\sahil\\OneDrive\\Documents\\advent\\day12\\largerexample.txt";
+    std:string input = "C:\\Users\\sahil\\OneDrive\\Documents\\advent\\day12\\myInput.txt";
     const auto garden = readFile(input);
+    const int N = garden[0].size();
 
     int x;
     std::cin >> x;
 
+    //auto timeStart = std::chrono::high_resolution_clock::now();
+
+    //// Let's start by finding how many regions there are.
+    //// What do I need to uniquely identify a region?
+    //// I need a letter
+    //// And I need an list of all coordinates associated with that
+    //// Let's map a unique coordinate to each point
+    //// vectors are 0 indexed using i and j
+    //// First row is 1 2 3 4
+    //// second row is 5 6 7 8
+    //// row size = 4
+    //// 
+    //// unique coordinate = rowsize*i + j + 1
+    //const int N = garden[0].size();
+
+    //// Let's now traverse the garden and start constructing regions
+    //std::vector<std::shared_ptr<Region>> regions;
+    //std::vector<int> traversed = {};
+
+    //// Start at 0,0, and keep traversing until we've looked at every entry
+    //int i = 0;
+    //int j = 0;
+    //auto start = std::make_pair(i,j);
+
+    //// Create a new region
+    ////Region region(garden[i][j],unique(i,j,N),N);
+    //auto region = std::make_shared<Region>(garden[i][j], unique(i, j, N), N);
+    //regions.push_back(region);
+
+    //// No point is exempt at first
+    //std::pair<int, int> noexemption = {-1,-1};
+    //runSearch(region, start, noexemption,regions, traversed, N, garden);
+
+    ////// This is due to some error in the way I wrote the traversal code and it's ordering
+    //// and how traversal down a chain unravels.
+    //// There may be regions that are adjacent or overlapping that did not get fully traversed,
+    //// So we have to do a unification pass
+    //std::vector<int> regionsToSkip = {};
+    //int nRegions = regions.size();
+    //for( int i = 0; i < nRegions; i++  )
+    //{
+    //    for( int j = 0; j < nRegions; j++ )
+    //    {
+    //        if( i == j )
+    //        {
+    //            continue;
+    //        }
+
+
+    //        // Let's not allow for opposite index flip matches to be unified as well
+    //        if (std::find(regionsToSkip.begin(), regionsToSkip.end(), i) != regionsToSkip.end())
+    //            continue;
+
+    //        // Do we have any overlapping points?
+    //        if( *regions[i] == *regions[j])
+    //        {
+    //            // Let's gather all the points and make them unique
+    //            std::vector<int> newVec(regions[i]->getRegionPositions());
+    //            newVec.insert(newVec.end(),regions[j]->getRegionPositions().begin(), regions[j]->getRegionPositions().end());
+    //            std::sort(newVec.begin(),newVec.end());
+    //            auto unique_end = std::unique(newVec.begin(), newVec.end());
+    //            newVec.erase(unique_end, newVec.end());
+
+    //            // Now that we have combined unique set of points, let's make our new combined region
+    //            auto newRegion = std::make_shared<Region>(regions[i]->letter(), newVec[0], N);
+
+    //            // Let's add our points one at a time
+    //            // The region updating code should be order agnostic
+    //            for( int n = 1; n < newVec.size(); n++ )
+    //            {
+    //                newRegion->add(newVec[n]);
+    //            }
+
+    //            // Let's remove the old regions from being in the cost calculation and add the new one
+    //            regionsToSkip.push_back(i);
+    //            regionsToSkip.push_back(j);
+    //            regions.push_back(newRegion);
+    //        }
+
+    //    }
+    //}
+
+    //// Print off the regions and calculate cost
+    //std::cout << "*****" << std::endl;
+    //int cost = 0;
+    //for (int i = 0; i < regions.size(); i++)
+    //{
+    //    // Skip any regions we unified, we don't want the constituents
+    //    if (std::find(regionsToSkip.begin(), regionsToSkip.end(), i) != regionsToSkip.end()) continue;
+
+    //    const auto r = regions[i];
+    //    std::cout << "Region " << r->letter() << "'s area is " << r->area() << " and perimeter is " << r->perimeter() << std::endl;
+    //    cost += r->cost();
+    //}
+
+    //auto timeEnd = std::chrono::high_resolution_clock::now();
+    //std::chrono::duration<double, std::milli> elapsed = timeEnd - timeStart;
+
+
+    //std::cout << std::endl << "Total cost is: " << cost << std::endl;
+    //std::cout << "Elapsed time: " << elapsed.count() << " ms" << std::endl;
+
+
+
+
+    // What if I don't even search? Let's allow for regions that are disconnected soups
+    // The interior partitioning rules should still hold for arbitrary point adding
     auto timeStart = std::chrono::high_resolution_clock::now();
-
-    // Let's start by finding how many regions there are.
-    // What do I need to uniquely identify a region?
-    // I need a letter
-    // And I need an list of all coordinates associated with that
-    // Let's map a unique coordinate to each point
-    // vectors are 0 indexed using i and j
-    // First row is 1 2 3 4
-    // second row is 5 6 7 8
-    // row size = 4
-    // 
-    // unique coordinate = rowsize*i + j + 1
-    const int N = garden[0].size();
-
-    // Let's now traverse the garden and start constructing regions
-    std::vector<std::shared_ptr<Region>> regions;
-    std::vector<int> traversed = {};
-
-    // Start at 0,0, and keep traversing until we've looked at every entry
-    int i = 0;
-    int j = 0;
-    auto start = std::make_pair(i,j);
-
-    // Create a new region
-    //Region region(garden[i][j],unique(i,j,N),N);
-    auto region = std::make_shared<Region>(garden[i][j], unique(i, j, N), N);
-    regions.push_back(region);
-
-    // No point is exempt at first
-    std::pair<int, int> noexemption = {-1,-1};
-    runSearch(region, start, noexemption,regions, traversed, N, garden);
-
-    //// This is due to some error in the way I wrote the traversal code and it's ordering
-    // and how traversal down a chain unravels.
-    // There may be regions that are adjacent or overlapping that did not get fully traversed,
-    // So we have to do a unification pass
-    std::vector<int> regionsToSkip = {};
-    int nRegions = regions.size();
-    for( int i = 0; i < nRegions; i++  )
+    std::vector<SoupRegion> soupRegions = {};
+    for( int i = 0; i < N; i++ )
     {
-        for( int j = 0; j < nRegions; j++ )
+        for( int j = 0; j < N; j++ )
         {
-            if( i == j )
+            // Retreive the letter
+            char letter = garden[i][j];
+
+            // Does a region associated with this letter already exist?
+            bool regionExists = false;
+            for( auto & r : soupRegions )
             {
-                continue;
-            }
-
-
-            // Let's not allow for opposite index flip matches to be unified as well
-            if (std::find(regionsToSkip.begin(), regionsToSkip.end(), i) != regionsToSkip.end())
-                continue;
-
-            // Do we have any overlapping points?
-            if( *regions[i] == *regions[j])
-            {
-                // Let's gather all the points and make them unique
-                std::vector<int> newVec(regions[i]->getRegionPositions());
-                newVec.insert(newVec.end(),regions[j]->getRegionPositions().begin(), regions[j]->getRegionPositions().end());
-                std::sort(newVec.begin(),newVec.end());
-                auto unique_end = std::unique(newVec.begin(), newVec.end());
-                newVec.erase(unique_end, newVec.end());
-
-                // Now that we have combined unique set of points, let's make our new combined region
-                auto newRegion = std::make_shared<Region>(regions[i]->letter(), newVec[0], N);
-
-                // Let's add our points one at a time
-                // The region updating code should be order agnostic
-                for( int n = 1; n < newVec.size(); n++ )
+                if( r.letter() == letter )
                 {
-                    newRegion->add(newVec[n]);
+                    regionExists = true;
+                    r.add(unique(i,j,N));
+                    break;
                 }
-
-                // Let's remove the old regions from being in the cost calculation and add the new one
-                regionsToSkip.push_back(i);
-                regionsToSkip.push_back(j);
-                regions.push_back(newRegion);
             }
 
+            // If a region with this letter doesn't exist, create it
+            if( !regionExists )
+            {
+                soupRegions.emplace_back(letter,unique(i,j,N),N);
+            }
         }
     }
 
-    // Print off the regions and calculate cost
-    std::cout << "*****" << std::endl;
+    std::cout << std::endl << "*** Alternate Method:" << std::endl;
+    // Compute the cost and print it
     int cost = 0;
-    for (int i = 0; i < regions.size(); i++)
+    for (int i = 0; i < soupRegions.size(); i++)
     {
-        // Skip any regions we unified, we don't want the constituents
-        if (std::find(regionsToSkip.begin(), regionsToSkip.end(), i) != regionsToSkip.end()) continue;
+        int rCost = soupRegions[i].cost();
+        cost += rCost;
 
-        const auto r = regions[i];
-        std::cout << "Region " << r->letter() << "'s area is " << r->area() << " and perimeter is " << r->perimeter() << std::endl;
-        cost += r->cost();
+        std::cout << soupRegions[i].letter() << ", " << rCost << std::endl;
     }
-
     auto timeEnd = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> elapsed = timeEnd - timeStart;
-
 
     std::cout << std::endl << "Total cost is: " << cost << std::endl;
     std::cout << "Elapsed time: " << elapsed.count() << " ms" << std::endl;
