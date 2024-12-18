@@ -211,6 +211,243 @@ public:
 		return area_ * (upSegments + downSegments + leftSegments + rightSegments);
 	};
 
+
+
+
+
+	int discountedCost3() 
+	{
+		// Easy cases
+		if (coordinates_.size() == 1) { return 4; }
+		if (coordinates_.size() == 2) { return 8; }
+
+		// We're going to use edge alignment, so let's change back to 2D
+		struct Point
+		{
+			int row;
+			int column;
+
+			bool operator==(const Point& other) const
+			{
+				return (row == other.row) && (column == other.column);
+			};
+		};
+		std::vector<Point> points = {};
+
+		std::sort(coordinates_.begin(), coordinates_.end());
+		for( const auto & p : coordinates_ )
+		{
+			int zeroBasedIndex = p - 1;
+
+			// Calculate the row and column in the original matrix
+			int rowOriginal = zeroBasedIndex / N_;
+			int colOriginal = zeroBasedIndex % N_;
+
+			points.emplace_back(rowOriginal,colOriginal);
+		}
+
+		// Let's loop over the first row and implement the first row rule
+		int cRow = points[0].row;
+		int maxRow = points[points.size() - 1].row;
+		int i = 0;
+		int sides = 0;
+		std::vector<Point> previousRowPoints = {};
+		std::vector<Point> currentRow = {};
+		while (points[i].row == cRow)
+		{
+			// If this is the right edge, add 4 to the number of sides
+			// Second entry guaranteed to exist due to the easy case returns
+
+			if (i == points.size() - 1) 
+			{
+				sides += 4;
+				return area_ * sides;
+			}
+
+			// If the next entry is not in the low row, we're done on the first row
+			if (points[i + 1].row != cRow)
+			{
+				sides += 4;
+				currentRow.push_back(points[i]);
+				i++;
+				break;
+			}
+
+			// Keep checking each entry to see if the next entry is adjacent or not
+			// If not, add 4 to the number of sides
+			if (points[i + 1].column != points[i].column + 1)
+			{
+				sides += 4;
+			}
+
+			// Save this point as being in the previous row
+			currentRow.push_back(points[i]);
+
+
+			// Increment i
+			i++;
+		}
+
+		// Lambda to update the current and previous positions
+		auto updatePositions = [&]() { previousRowPoints = currentRow; currentRow = {}; };
+		
+		// Update the positions and change the current positions to previous
+		updatePositions();
+
+		// Now, the index i is at the second row
+		// Due to topology, this has to be the previous row + 1.
+		cRow += 1;
+
+		// Is a point present in a vector?
+		auto pointIsPresent = [&](const Point & p, const std::vector<Point> & v) 
+			{
+				if (std::find(v.begin(),v.end(), p) != v.end()) return true;
+				return false;
+			};
+
+		while (cRow <= maxRow)
+		{
+			// Check the second row and implement the row rule
+			while (points[i].row == cRow)
+			{
+				Point p = points[i];
+
+				// For this current position, is the point left aligned?
+				// If not, add 2 to the side count
+				if (!((pointIsPresent(Point{ p.row - 1,p.column }, previousRowPoints) &&
+					!isLeftEdge(unique(p.row, p.column, N_), N_) &&
+					!pointIsPresent(Point{ p.row - 1,p.column - 1 }, previousRowPoints) &&
+					!pointIsPresent(Point{ p.row,p.column - 1 }, points))))
+					sides += 2;
+
+				bool isLeftAligned = true;
+				if (!pointIsPresent(Point{ p.row - 1,p.column }, previousRowPoints)) isLeftAligned = false;
+
+				// For this current position, is the point right aligned?
+				// If not, add 2 to the side count
+				if (!((pointIsPresent(Point{ p.row - 1,p.column }, previousRowPoints) &&
+					!isRightEdge(unique(p.row, p.column, N_), N_) &&
+					!pointIsPresent(Point{ p.row - 1,p.column + 1 }, previousRowPoints) &&
+					!pointIsPresent(Point{ p.row,p.column + 1 }, points))))
+					sides += 2;
+
+
+				// Update current position
+				currentRow.push_back(points[i]);
+
+				// Increment i
+				i++;
+			}
+
+			cRow++;
+		}
+
+		// Set the current positions to the previous ones and empty the current set
+		updatePositions();
+
+		return area_ * sides;
+	
+	}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	int discountedCost2()
+	{
+		if (coordinates_.size() == 1) { return 4; }
+		if (coordinates_.size() == 2) { return 8; }
+		// hi
+
+		// First coordinate gives us 4 sides
+		int sides = 0;
+		auto points = coordinates_;
+
+
+		// Sort points
+		std::sort(points.begin(), points.end());
+
+		// Add 1 to uniqueID until new uniqueID is not in coordinate list 
+		// then check if next coordinate in list is on first row of region (+4 to size every time)
+		// Edge case: row wraps around
+		int i = 0;
+		for (; i < points.size(); i++)
+		{
+			if (i == points.size() - 1) { return (sides + 4) * area_; } // It's the last point so we can return our answer now
+			if (points[i] % N_ == 0) // Hit the end of the row
+			{
+				sides += 4;
+				break;
+			}
+			if (points[i + 1] != points[i] + 1) // Hit the end of the current segment on this row
+			{
+				sides += 4;
+				continue;
+			}
+		}
+
+
+		// Check rest of the rows; find left edge of region (i.e. index mod N = 0 or index -1 not in list) check if edge unaligned (NEED FUNCTION FOR THIS) then +2
+		// Then right edge of region (index +1 not in list or index % N = N-1 ) then and if yes, + 2
+		auto IsLeftEdge = [=](int uniqueID, int index) 
+			{
+				// We can't traverse left if we're on the left edge of the garden
+				if (index == 0) return true;
+				if (isLeftEdge(uniqueID, N_)) return true;
+				return points[index - 1] == uniqueID - 1;
+			};
+
+		auto IsRightEdge = [=](int uniqueID, int index)
+			{
+				// We can't traverse left if we're on the left edge of the garden
+				if (index == (N_ * N_) -1 ) return true;
+				if (isRightEdge(uniqueID, N_)) return true;
+				return points[index - 1] == uniqueID - 1;
+			};
+
+		auto IsLeftEdgeAligned = [=](int uniqueID)
+			{
+				int upLeft = uniqueID - N_ - 1;
+				if (!isLeftEdge(uniqueID, N_) && std::find(points.begin(), points.end(), upLeft) != points.end()) { return false; };
+				if (std::find(points.begin(), points.end(), uniqueID - N_) == points.end()) { return false; };
+				return true;
+			};
+
+		auto IsRightEdgeAligned = [=](int uniqueID)
+			{
+				int upRight = uniqueID - N_ + 1;
+				if (!isRightEdge(uniqueID, N_) && std::find(points.begin(), points.end(),upRight) != points.end()) { return false; };
+				if (std::find(points.begin(), points.end(), uniqueID - N_) == points.end()) { return false; };
+				return true;
+			};
+		while (i < points.size())
+		{
+			if (IsLeftEdge(points[i], i) && !IsLeftEdgeAligned(points[i]) || IsRightEdge(points[i], i) && !IsRightEdgeAligned(points[i]))
+			{
+				sides += 2;
+			}
+			i++;
+		}
+
+
+		return area_ * sides;
+	};
+
+
+
+
+
+
+
 private:
 	std::vector<int> coordinates_;
 	char letter_;
@@ -384,6 +621,47 @@ public:
 		return cost;
 	}
 
+	// The second objective function, which has a cost based on the number of unique sides to the
+// fence, not the total perimeter
+	int discountedCost2()
+	{
+		int cost = 0;
+
+		// Same as for the regular cost, we do need to assemble all the subregions for this soup
+		// Let's keep track of them in a vector
+		std::vector<Region> subRegions = {};
+
+		// Let's also back up the coordinates for restoring later
+		std::vector<int> originalCoordinates = coordinates_;
+
+		while (coordinates_.size() > 0)
+		{
+			// Start with the first point in the vector
+			// Create a new search region
+			int start = coordinates_[0];
+			Region r{ letter(),start,N_ };
+
+			// Now that we've considered this point, delete it
+			coordinates_.erase(coordinates_.begin());
+
+			// Do the recursive adjacent search
+			recurse(start, r);
+
+			// Let's push back the populated region for later referral
+			subRegions.push_back(r);
+		}
+
+		// Now we have all of the subregions in this soup
+		// For each subregion, we need to accumulate the discounted cost
+		// Let's restore the coordinates, and do the discounted analysis
+		coordinates_ = originalCoordinates;
+		for (auto& r : subRegions)
+		{
+			cost += r.discountedCost3();
+		}
+		return cost;
+	}
+
 private:
 	std::vector<int> coordinates_;
 	char letter_;
@@ -393,18 +671,22 @@ private:
 int main()
 {
 	// Input files, pick one to start:
-	//std:string input = "C:\\Users\\sahil\\OneDrive\\Documents\\advent\\day12\\smallexample.txt";
+	std:string input = "C:\\Users\\sahil\\OneDrive\\Documents\\advent\\day12\\smallexample.txt";
 	//std:string input = "C:\\Users\\sahil\\OneDrive\\Documents\\advent\\day12\\eshaped.txt";
 	//std:string input = "C:\\Users\\sahil\\OneDrive\\Documents\\advent\\day12\\aabbaaexample.txt";
 	//std:string input = "C:\\Users\\sahil\\OneDrive\\Documents\\advent\\day12\\debugtest.txt";
 	//std:string input = "C:\\Users\\sahil\\OneDrive\\Documents\\advent\\day12\\nestedexample.txt";
 	//std:string input = "C:\\Users\\sahil\\OneDrive\\Documents\\advent\\day12\\largerexample.txt";
-	std:string input = "C:\\Users\\sahil\\OneDrive\\Documents\\advent\\day12\\myInput.txt";
+	//std:string input = "C:\\Users\\sahil\\OneDrive\\Documents\\advent\\day12\\strandedexample.txt";
+	//std:string input = "C:\\Users\\sahil\\OneDrive\\Documents\\advent\\day12\\myInput.txt";
 	const auto garden = readFile(input);
 	const int N = garden[0].size();
 
+	int x;
+	std::cin >> x;
 
-	// Let's create out disconnected soup regions
+
+	// Let's create our disconnected soup regions
 	// Note that we also do the dimension reduction here
 	// This loop is the only place where the i,j coordinates of the garden
 	// are ever referred to. Following this, the problem is one dimensional
@@ -438,6 +720,14 @@ int main()
 			}
 		}
 	}
+
+	// Katie's special method
+	int discounted2Cost = 0;
+	for (int i = 0; i < soupRegions.size(); i++)
+	{
+		discounted2Cost += soupRegions[i].discountedCost2();
+	}
+	std::cout << "Total discounted cost 2 is: " << discounted2Cost << std::endl;
 
 	//-------------------------------------------------------------
 	// Part 1: Regular cost

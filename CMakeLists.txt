@@ -11,5 +11,9 @@ endif()
 
 project ("Day12")
 
+find_package(TBB)
+
 # Include sub-projects.
+add_subdirectory ("Day1")
+add_subdirectory ("Day11")
 add_subdirectory ("Day12")
